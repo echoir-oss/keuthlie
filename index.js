@@ -223,7 +223,7 @@ async function createToken(database, id) {
 	const soyH = ssha512(await getUserSoy(database, id));
 	const dataA = ssha512(generateBytes(64));
 
-	const prepend = `00\$nyauth\$${id}\$${soyH}\$${dataA}`;
+	const prepend = `00\$keuthlie\$${id}\$${soyH}\$${dataA}`;
 	const signature = signString(prepend);
 	const ret = `${prepend}\$${signature}`;
 
