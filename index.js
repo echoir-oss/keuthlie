@@ -12,7 +12,7 @@ const privateKeyText = fs.readFileSync("./certs/key.pem", "utf-8");
 const publicKeyText = fs.readFileSync("./certs/cert.pem", "utf-8");
 
 const privateKey = crypto.createPrivateKey(privateKeyText);
-const publicKey = crypto.createPublicKey(privateKeyText);
+const publicKey = crypto.createPublicKey(publicKeyText);
 const config = require("./config.js");
 
 const pool = new pg.Pool(config.pgconf);
@@ -124,7 +124,7 @@ async function getPasshash(database, id) {
 
 async function updatePassword(database, id, password) {
 	try {
-		const soy = sha512(generateBytes(32));
+		const soy = ssha512(generateBytes(32));
 		const passhash = await argon2.hash(password);
 		const resultA = await database.query("UPDATE keuthlie_auth SET passhash = $2 WHERE id = $1;", [id, passhash]);
 		const resultB = await database.query("UPDATE keuthlie_auth SET soy = $2 WHERE id = $1;", [id, soy]);
@@ -211,19 +211,57 @@ function sha512(data) {
 	return crypto.createHash("sha3-512").update(data).digest("hex");
 }
 
+function ssha512(data) {
+	return sha512(data).toString("hex");
+}
+
 function generateBytes(n) {
 	return crypto.randomBytes(n);
 }
 
-async function createToken(database, id, service) {
-	const hashieA = sha512(await getUserSoy(database, id));
-	const hashieB = sha512(generateBytes(64));
+async function createToken(database, id) {
+	const soyH = ssha512(await getUserSoy(database, id));
+	const dataA = ssha512(generateBytes(64));
 
-	const prepend = `00\$keuthlie\$${id}\$${sha512(service)}\$${hashieA}\$${hashieB}`;
-	const sign = signString(prepend);
-	const full = `${prepend}\$${sign}`;
+	const prepend = `00\$nyauth\$${id}\$${soyH}\$${dataA}`;
+	const signature = signString(prepend);
+	const ret = `${prepend}\$${signature}`;
 
-	return full;
+	return ret;
+}
+
+async function verifyToken(database, token) {
+	const splitThing = token.split("$");
+
+	if (splitThing[0] !== "00") {
+		return false;
+	}
+
+	if (splitThing.length !== 6) {
+		return null;
+	}
+
+	const version = splitThing[0];
+	const reportedAuthServer = splitThing[1];
+	const userId = splitThing[2];
+	const soyHashedB = splitThing[3];
+	const randomData = splitThing[4];
+	const signature = Buffer.from(splitThing[5], "hex");
+
+	const withoutSignature = splitThing.reverse().slice(1).reverse().join("$");
+
+	const valid = crypto.verify("RSA-SHA512", sha512(withoutSignature), publicKey, signature);
+
+	if (!valid) {
+		return false;
+	}
+
+	const soyHashedA = ssha512(await getUserSoy(database, userId));
+	if (soyHashedA !== soyHashedB) {
+		return false;
+	}
+
+	return true;
 }
 
 function signString(stringie) {
