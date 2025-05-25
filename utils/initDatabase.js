@@ -1,6 +1,6 @@
 const pg = require("pg");
 
-const config = require("../config.json");
+const config = require("../config.js");
 
 const dbpool = new pg.Pool(config.pgconf);
 

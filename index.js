@@ -126,7 +126,7 @@ async function getPasshash(database, id) {
 
 async function updatePassword(database, id, password) {
 	try {
-		const soy = sha512(randomBytes(32));
+		const soy = sha512(generateBytes(32));
 		const passhash = await argon2.hash(password);
 		const resultA = await database.query("UPDATE keuthlie_auth SET passhash = $2 WHERE id = $1;", [id, passhash]);
 		const resultB = await database.query("UPDATE keuthlie_auth SET soy = $2 WHERE id = $1;", [id, soy]);
@@ -217,8 +217,8 @@ function generateBytes(n) {
 	return crypto.randomBytes(n);
 }
 
-async function createToken(id, service) {
-	const hashieA = sha512(await getUserSoy(id));
+async function createToken(database, id, service) {
+	const hashieA = sha512(await getUserSoy(database, id));
 	const hashieB = sha512(generateBytes(64));
 
 	const prepend = `00\$keuthlie\$${id}\$${sha512(service)}\$${hashieA}\$${hashieB}`;
@@ -238,6 +238,10 @@ function signString(stringie) {
 	console.log(Date.now()-a);
 	return signInstance.sign(privateKey).toString("hex");
 }
+
+app.post("/api/v0/auth/verifyToken", async (req, res, next) => {
+	//
+});
 
 app.post("/api/v0/auth/register/email", async (req, res, next) => {
 	if (typeof req.body?.email !== "string" ||
@@ -397,7 +401,7 @@ app.post("/api/v0/auth/login/email", async (req, res, next) => {
 			throw new Error("guh");
 		}
 
-		const token = await createToken(id, req.body.service);
+		const token = await createToken(database, id, req.body.service);
 
 		res.status(200);
 		res.json({
