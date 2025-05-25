@@ -1,0 +1,13 @@
+{
+	"pgconf": {
+		"host": "0.0.0.0",
+		"user": "username",
+		"password": "password",
+		"max": 0
+	},
+	"argon2": {},
+	"keuthlie": {
+		"port": 0,
+		"allowedServices": []
+	}
+}
