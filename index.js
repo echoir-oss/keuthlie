@@ -230,34 +230,40 @@ async function createToken(database, id) {
 	return ret;
 }
 
-async function verifyToken(database, token) {
+function parseToken(token) {
 	const splitThing = token.split("$");
 
 	if (splitThing[0] !== "00") {
-		return false;
+		return null;
 	}
 
 	if (splitThing.length !== 6) {
 		return null;
 	}
 
-	const version = splitThing[0];
-	const reportedAuthServer = splitThing[1];
-	const userId = splitThing[2];
-	const soyHashedB = splitThing[3];
-	const randomData = splitThing[4];
-	const signature = Buffer.from(splitThing[5], "hex");
-
 	const withoutSignature = splitThing.reverse().slice(1).reverse().join("$");
 
-	const valid = crypto.verify("RSA-SHA512", sha512(withoutSignature), publicKey, signature);
+	return {
+		version: splitThing[0],
+		reportedAuthServer: splitThing[1],
+		userId: splitThing[2],
+		soyHashed: splitThing[3],
+		randomData: splitThing[4],
+		signature: Buffer.from(splitThing[5], "hex"),
+		withoutSignature
+	}
+}
 
+async function verifyToken(database, token) {
+	const tokenParse = parseToken(token);
+
+	const valid = crypto.verify("RSA-SHA512", sha512(tokenParse.withoutSignature), publicKey, tokenParse.signature);
 	if (!valid) {
 		return false;
 	}
 
-	const soyHashedA = ssha512(await getUserSoy(database, userId));
-	if (soyHashedA !== soyHashedB) {
+	const soyHashed = ssha512(await getUserSoy(database, userId));
+	if (tokenParse.soyHashed !== soyHashed) {
 		return false;
 	}
 
@@ -273,8 +279,20 @@ function signString(stringie) {
 	return signInstance.sign(privateKey).toString("hex");
 }
 
-app.post("/api/v0/auth/verifyToken", async (req, res, next) => {
-	//
+app.post("/api/v0/auth/verifyTokenValidity", async (req, res, next) => {
+	if (typeof req.body.token !== "string" ||
+	    typeof req.body.service !== "string")
+	{
+		res.status(400);
+		res.json({
+			error: -5,
+			message: "Invalid data provided!"
+		});
+
+		return;
+	}
+
+	const id = await verifyToken()
 });
 
 app.post("/api/v0/auth/register/email", async (req, res, next) => {
