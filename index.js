@@ -26,13 +26,11 @@ app.use(async (req, res, next) => {
 	res.setHeader("Access-Control-Request-Method", "GET, POST");
 
 	req.on("end", async () => {
-		console.log(res.statusCode);
-
 		printMethod(req.method);
 		printStatusCode(res.statusCode);
 		printLatency(Date.now()-start);
 
-		process.stderr.write(`${req.path}\n`);
+		stderr.write(`${req.path}\n`);
 	});
 
 	next();
@@ -222,7 +220,6 @@ async function createToken(database, id, service) {
 	const hashieB = sha512(generateBytes(64));
 
 	const prepend = `00\$keuthlie\$${id}\$${sha512(service)}\$${hashieA}\$${hashieB}`;
-	console.log(prepend);
 	const sign = signString(prepend);
 	const full = `${prepend}\$${sign}`;
 
@@ -235,7 +232,6 @@ function signString(stringie) {
 
 	signInstance.update(stringie);
 	signInstance.end();
-	console.log(Date.now()-a);
 	return signInstance.sign(privateKey).toString("hex");
 }
 
@@ -264,10 +260,6 @@ app.post("/api/v0/auth/register/email", async (req, res, next) => {
 		const username = req.body.username;
 		const password = req.body.password;
 		const email = req.body.email;
-
-		process.stderr.write(`email -> ${email}\n`);
-		process.stderr.write(`password -> ${password}\n`);
-		process.stderr.write(`username -> ${username}\n`);
 
 		if (password.length <= 8) {
 			res.status(403);
@@ -347,9 +339,6 @@ app.post("/api/v0/auth/login/email", async (req, res, next) => {
 		const service = req.body.service;
 		const email = req.body.email;
 
-		process.stderr.write(`email -> ${email}\n`);
-		process.stderr.write(`password -> ${password}\n`);
-
 		if (password.length <= 8) {
 			res.status(403);
 			res.json({
@@ -361,8 +350,6 @@ app.post("/api/v0/auth/login/email", async (req, res, next) => {
 
 		const id = await getIdFromEmail(database, email);
 		if (id === null) {
-			console.log(id);
-
 			res.status(403);
 			res.json({ error: -5, message: "Invalid data provided!" });
 			throw Error("huh buh");
@@ -381,9 +368,6 @@ app.post("/api/v0/auth/login/email", async (req, res, next) => {
 		let allowed = false;
 		for (let i = 0; i < config.keuthlie.allowedServices.length; i++) {
 			const _service = config.keuthlie.allowedServices[i];
-
-			console.log(_service);
-			console.log(service);
 
 			if (_service === service) {
 				allowed = true;
@@ -416,7 +400,6 @@ app.post("/api/v0/auth/login/email", async (req, res, next) => {
 		await database.query("ROLLBACK;");
 
 		console.error(e);
-		console.log("buh");
 
 		res.status(500);
 		res.end("uhm. yeah, if you see this on the website, please report this with details. thanks!");
